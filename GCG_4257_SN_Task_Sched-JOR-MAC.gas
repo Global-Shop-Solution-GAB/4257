@@ -1,0 +1,92 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.iPid.Declare(Long)
+V.Local.sPrgm.Declare(String)
+V.Local.fTimerS.Declare(Float)
+V.Local.fTimerN.Declare(Float)
+V.Local.dCurrentTime.Declare(Date)
+V.Local.iHour.Declare(Long)
+V.Local.dNextTime.Declare(Date)
+V.Local.sOpenTask.Declare(String)
+V.Local.bFound.Declare(Boolean)
+
+' verify the license
+'F.Intrinsic.Control.CallSub(Licenseverification)
+
+' when the task starts,run the export and import
+F.Intrinsic.String.Concat(V.Caller.PluginsDir,"\GAB\GAS\GCG_4257_GSS_To_SigmaNest-JOR-MAC.gas",V.Local.sPrgm)
+F.Global.General.CallSyncGAS(V.Local.sPrgm)
+
+F.Intrinsic.String.Concat(V.Caller.PluginsDir,"\GAB\GAS\GCG_4257_SigmaNest_To_GSS-JOR-MAC.gas",V.Local.sPrgm)
+F.Global.General.CallSyncGAS(V.Local.sPrgm)
+
+
+
+' get difference in time between now and 11:58
+F.Intrinsic.Date.ConvertTString("2358","HHNN",V.Local.dNextTime)
+F.Intrinsic.Date.DateDiff("N",V.Ambient.Time,V.Local.dNextTime,V.Local.iHour)
+
+' if within 5 minuntes of 11:58 pm, go ahead and end for the day.
+F.Intrinsic.Control.If(V.Local.iHour,<=,15)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+' ater complete, start the Timer
+' get the current time and add 5 minutes (300 seconds)
+F.Intrinsic.UI.Timer(V.Local.fTimerS)
+F.Intrinsic.Math.Add(V.Local.fTimerS,900,V.Local.fTimerS)
+
+F.Intrinsic.Control.Dountil(V.Local.fTimerN,>=,V.Local.fTimerS)
+	' get the current time
+	F.Intrinsic.UI.Timer(V.Local.fTimerN)
+	F.Intrinsic.UI.Sleep(300)
+F.Intrinsic.Control.Loop
+
+F.Intrinsic.String.Build("{0}\GAB\GAS\GCG_4257_SN_Task_Sched-JOR-MAC.gas",V.Caller.PluginsDir,V.Local.sOpenTask)
+F.Intrinsic.File.Exists(V.Local.sOpenTask,V.Local.bFound)
+F.Intrinsic.Control.If(V.Local.bFound,=,True)
+	F.Global.General.CallAsyncGAS(V.Local.sOpenTask,V.Local.iPID)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4257_SN_Task_Sched-JOR-MAC.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.Debug.SetLA(V.Local.sError)
+	F.Intrinsic.Control.End
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Licenseverification.Start
+
+
+V.Local.bLicensed.Declare(Boolean)
+
+' if license is not found, the script will end
+f.Global.General.IsLicensedByModuleName("NES",v.Local.bLicensed)
+F.Intrinsic.Control.If(V.Local.bLicensed,=,False)
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+Program.Sub.Licenseverification.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_SigmanNest_Task_Scheduler.$}$JCT$}$3/2/2012
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$For Loius Industries.
+One GAB script to setup in the Task Scheduler to call the SN90, SN941, SN84 GAB sripts
+Program.Sub.Comments.End
+
