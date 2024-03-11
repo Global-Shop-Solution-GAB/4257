@@ -1,0 +1,251 @@
+Program.Sub.ScreenSU.Start
+gui.SS_Form1..create
+gui.SS_Form1..caption("GCG SN90")
+gui.SS_Form1..size(2665,1810)
+gui.SS_Form1..position(0,0)
+gui.SS_Form1..event(unload,ss_form1_unload)
+gui.SS_Form1..alwaysontop(False)
+gui.SS_Form1..fontname("Arial")
+gui.SS_Form1..fontsize(8)
+gui.SS_Form1..forecolor(0)
+gui.SS_Form1..fontstyle(,,,,)
+gui.SS_Form1..BackColor(-2147483633)
+gui.SS_Form1..controlbox(True)
+gui.SS_Form1..maxbutton(False)
+gui.SS_Form1..minbutton(False)
+gui.SS_Form1..mousepointer(0)
+gui.SS_Form1..moveable(True)
+gui.SS_Form1..sizeable(False)
+gui.SS_Form1..ShowInTaskBar(True)
+gui.SS_Form1..titlebar(True)
+gui.SS_Form1.lbl_txtPL.create(label,"Product Line",True,1800,200,1,100,135,True,0,Arial,8,-2147483633,0)
+gui.SS_Form1.lbl_txtPL.defaultvalue("")
+gui.SS_Form1.lbl_txtPL.controlgroup(0)
+gui.SS_Form1.txtPL.create(textbox,"",True,1800,330,1,100,335,True,0,Arial,8,16777215,1)
+gui.SS_Form1.txtPL.defaultvalue("")
+gui.SS_Form1.txtPL.controlgroup(0)
+gui.SS_Form1.cmd_txtPL.create(button)
+gui.SS_Form1.cmd_txtPL.caption("^")
+gui.SS_Form1.cmd_txtPL.visible(True)
+gui.SS_Form1.cmd_txtPL.size(330,330)
+gui.SS_Form1.cmd_txtPL.zorder(0)
+gui.SS_Form1.cmd_txtPL.position(1985,335)
+gui.SS_Form1.cmd_txtPL.enabled(True)
+gui.SS_Form1.cmd_txtPL.fontname("Arial")
+gui.SS_Form1.cmd_txtPL.fontsize(8)
+gui.SS_Form1.cmd_txtPL.event(click,cmd_txtpl_click)
+gui.SS_Form1.cmd_txtPL.defaultvalue("")
+gui.SS_Form1.cmd_txtPL.controlgroup(0)
+gui.SS_Form1.cmdOk.create(button)
+gui.SS_Form1.cmdOk.caption("Ok")
+gui.SS_Form1.cmdOk.visible(True)
+gui.SS_Form1.cmdOk.size(1000,360)
+gui.SS_Form1.cmdOk.zorder(0)
+gui.SS_Form1.cmdOk.position(100,835)
+gui.SS_Form1.cmdOk.enabled(True)
+gui.SS_Form1.cmdOk.fontname("Arial")
+gui.SS_Form1.cmdOk.fontsize(8)
+gui.SS_Form1.cmdOk.event(click,cmdok_click)
+gui.SS_Form1.cmdOk.defaultvalue("")
+gui.SS_Form1.cmdOk.controlgroup(0)
+gui.SS_Form1.txtPL.tabstop(true)
+gui.SS_Form1.txtPL.tabindex(1)
+gui.SS_Form1.cmd_txtPL.tabstop(true)
+gui.SS_Form1.cmd_txtPL.tabindex(2)
+gui.SS_Form1.cmdOk.tabstop(true)
+gui.SS_Form1.cmdOk.tabindex(3)
+
+
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Variable.UDT.Transaction.Define("PART",String,"PART")
+Variable.uGlobal.uTrans.Declare("Transaction")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+
+F.ODBC.Connection!Con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+F.Intrinsic.Control.CallSub(Licenseverification)
+Gui.SS_Form1..Show
+
+Program.Sub.Main.End
+
+program.sub.ss_form1_unload.start
+
+F.ODBC.Connection!Con.Close
+F.Intrinsic.Control.End
+
+program.sub.ss_form1_unload.end
+
+program.sub.cmd_txtpl_click.start
+
+V.Local.sRet.Declare(String)
+
+F.Intrinsic.UI.CommonBrowser(130,"",V.Local.sRet)
+F.Intrinsic.Control.If(V.Local.sRet.Trim,=,"***CANCEL***")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Split(V.Local.sRet,"*!*",V.Local.sRet)
+Gui.SS_Form1.txtPL.Text(V.Local.sRet(0).Trim)
+
+program.sub.cmd_txtpl_click.end
+
+program.sub.cmdok_click.start
+
+
+V.Local.sUpdateFile.Declare(String)
+V.Local.sSel.Declare(String)
+V.Local.sSelB.Declare(String)
+V.Local.iFor.Declare(Long)
+V.Local.iForB.Declare(Long)
+V.Local.sPart.Declare(String)
+V.Local.sRecord.Declare(String)
+V.Local.sRet.Declare(String)
+V.Local.sRetB.Declare(String)
+V.Local.sFile.Declare(String)
+V.Local.sVal.Declare(String)
+V.Local.Date.Declare(String)
+V.Local.Time.Declare(String)
+
+
+V.uGlobal.uTrans.Redim(-1,-1)
+F.Intrinsic.String.Build("select Part, Qty_OnHand, Amt_Cost from v_Inventory_Mstr where Product_Line = '{0}' and UM_Inventory = 'SH' order by Part",V.Screen.SS_Form1!txtPL.Text,V.Local.sSel)
+F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSel,V.Local.sRet)
+F.Intrinsic.Control.If(V.Local.sRet.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("No data found for entered parameters.")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+Gui.SS_Form1..Visible(false)
+F.Intrinsic.String.Split(V.Local.sRet,"#$#",V.Local.sRet)
+
+F.Intrinsic.Control.For(V.Local.iFor,V.Local.sRet.LBound,V.Local.sRet.UBound,1)
+	F.Intrinsic.String.Split(V.Local.sRet(v.Local.iFor),"*!*",V.Local.sVal)
+	V.Local.sVal.RedimPreserve(0,2)
+	V.Local.sRecord.Redim(-1,-1)
+	V.Local.sRecord.Redim(0,64)
+	' static values
+	V.Local.sRecord(0).Set("SN90")
+	V.Local.sRecord(1).Set("1")
+	' Sheet/Part
+	V.Local.sRecord(4).Set(V.Local.sVal(0))
+	' qty
+	V.Local.sRecord(5).Set(V.Local.sVal(1).Format*0.0000)
+	' cost
+	V.Local.sRecord(18).Set(V.Local.sVal(2).Format*0.0000)
+
+	F.Intrinsic.String.Build("select Length, Width from Inventory_Mst2 where Part = '{0}' ",V.Local.sPart.PSQLFriendly,V.Local.sSel)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSel,V.Local.sRetB)
+	F.Intrinsic.String.Split(V.Local.sRetB,"*!*",V.Local.sRetB)
+	V.Local.sRetB.RedimPreserve(0,1)
+	' length
+	V.Local.sRecord(14).Set(V.Local.sRetB(0).Format*0.0000)
+	' width
+	V.Local.sRecord(15).Set(V.Local.sRetB(1).Format*0.0000)
+
+	F.Intrinsic.String.Build("select Thickness from Inventory_Mst3 where Part = '{0}' ",V.Local.sPart.PSQLFriendly,V.Local.sSel)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSel,V.Local.sRetB)
+	V.Local.sRetB.RedimPreserve(0,0)
+	V.Local.sRecord(7).Set(V.Local.sRetB.Format*0.0000)
+
+	F.Intrinsic.String.Build("select Lot, Bin, Heat, Serial_Number from Item_Master where Part = '{0}' ",V.Local.sPart.PSQLFriendly,V.Local.sSel)
+	F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSel,V.Local.sRetB)
+	F.Intrinsic.Control.If(V.Local.sRetB.Trim,<>,"")
+		F.Intrinsic.String.Split(V.Local.sRetB,"#$#",V.Local.sRetB)
+		F.Intrinsic.Control.For(V.Local.iForB,V.Local.sRetB.LBound,V.Local.sRetB.UBound,1)
+			F.Intrinsic.String.Split(V.Local.sRetB(v.Local.iFor),"*!*",V.Local.sVal)
+			V.Local.sVal.RedimPreserve(0,3)
+			' Lot
+			' Bin
+			V.Local.sRecord(23).Set(V.Local.sVal(1).Trim)
+			' Hear
+			V.Local.sRecord(19).Set(V.Local.sVal(2).Trim)
+			' Serial Number
+			V.Local.sRecord(25).Set(V.Local.sVal(3).Trim)
+			F.Intrinsic.String.JoinCSV(V.Local.sRecord,False,V.Local.sRecord)
+			F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sUpdateFile,V.Local.sRecord,V.Ambient.NewLine,V.Local.sUpdateFile)
+		F.Intrinsic.Control.Next(V.Local.iForB)
+
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.JoinCSV(V.Local.sRecord,False,V.Local.sRecord)
+		F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sUpdateFile,V.Local.sRecord,V.Ambient.NewLine,V.Local.sUpdateFile)
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Next(V.Local.iFor)
+
+F.Intrinsic.Control.CallSub(Filepath)
+F.Intrinsic.String.DateString(V.Ambient.Now,V.Local.date)
+F.Intrinsic.String.TimeString(V.Ambient.Now,V.Local.time)
+F.Intrinsic.String.Build("{0}\{1}{2}.txt",V.Args.FILELOC,V.Local.date,V.Local.Time,V.Local.sFile)
+
+F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sUpdateFile)
+F.Intrinsic.Control.CallSub(Ss_form1_unload)
+
+program.sub.cmdok_click.end
+
+Program.Sub.filePath.Start
+
+V.Local.sSel.Declare(String)
+V.Local.sRet.Declare(String)
+V.Local.sHold.Declare(String)
+V.Local.sVal.Declare(String)
+V.Local.bRet.Declare(Boolean)
+V.Local.sFile.Declare(String)
+V.Local.iFor.Declare(Long)
+
+' see if the credential file is found
+F.Intrinsic.String.Build("{0}\SNLIC.dat",V.Caller.FilesDir,V.Local.sFile)
+F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bRet)
+
+' if the file is found, look for the INPUT line
+F.Intrinsic.Control.If(V.Local.bRet,=,True)
+	F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sRet)
+	F.Intrinsic.String.Split(V.Local.sRet,V.Ambient.NewLine,V.Local.sRet)
+	F.Intrinsic.Control.For(V.Local.iFor,V.Local.sRet.LBound,V.Local.sRet.UBound,1)
+		F.Intrinsic.String.Split(V.Local.sRet(v.Local.iFor),"::",V.Local.sHold)
+		V.Local.sHold.RedimPreserve(0,1)
+		F.Intrinsic.Control.SelectCase(V.Local.sHold(0))
+		F.Intrinsic.Control.Case("INPUT")
+			V.Local.sVal.Set(V.Local.sHold(1))
+			F.Intrinsic.Control.ExitFor(V.Local.iFor)
+		F.Intrinsic.Control.EndSelect
+	F.Intrinsic.Control.Next(V.Local.iFor)
+F.Intrinsic.Control.EndIf
+
+' if the path is found,send it back.  otherwise end the script
+F.Intrinsic.Control.If(V.Local.sVal,=,"")
+	F.Intrinsic.UI.Msgbox("INPUT file path not found.")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Variable.AddRV("FILELOC",V.Local.sVal)
+
+Program.Sub.filePath.End
+
+Program.Sub.licenseVerification.Start
+
+
+V.Local.bLicensed.Declare(Boolean)
+
+' if license is not found, the script will end
+f.Global.General.IsLicensedByModuleName("NES",v.Local.bLicensed)
+F.Intrinsic.Control.If(V.Local.bLicensed,=,False)
+	F.Intrinsic.UI.Msgbox("Not Licensed for Nesting Integrations")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+Program.Sub.licenseVerification.End
+
+Program.Sub.Comments.Start
+${$0$}$GCG_SN90$}$JCT$}$4/7/2015
+${$3$}$0$}$$}$-1$}$-1$}$$}$1/1/1900$}$SN90 transaction loads GSS Inventory into Sigma Nest
+Program.Sub.Comments.End
+Program.Sub.ScreenSS.Start
+SS_Form1{{CAPTION::GCG SN90
+SS_Form1.CTRL{{NAME::txtPL\\TYPE::2\\CAPTION::Product Line\\TABSTOP::1\\GROUP::1\\BROWSER::1\\SIZE::1
+SS_Form1.CTRL{{NAME::cmdOk\\TYPE::5\\CAPTION::Ok\\TABSTOP::2\\GROUP::2\\BROWSER::0\\SIZE::1
+
+Program.Sub.ScreenSS.End
+
