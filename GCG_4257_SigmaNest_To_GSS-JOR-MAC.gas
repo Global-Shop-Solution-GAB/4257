@@ -1,0 +1,294 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+
+
+'//************************************************************************************************************
+' This script is for reading feedback from Sigma Nest, for Labor Hours, Piece Counts, and
+' Material usage.  For Labor and Piece Counts, an employee ID should be created.  The file that
+' will be read will be a 36 field comma delimited file with fields:
+' JOBNUMBER, PROGRAMNUMBER, PARTNUMBER, QTYORDERED, QTYCompleted,
+' PartCuttingTimeOnePart_Hrs, NESTEDAREA_in_Ea_Part, NESTEDWEIGHT_Lbs, SHEETNAME,
+' PROGRAM_SCRAP_PERCENTAGE, MACHINE, SHT_LOCATION, SHT_HEATNUM, SHT_BinNum,
+' SHT_Mil, PRT_Data1, PRT_Data2, PRT_Data3, PRT_Data4, PRT_Data5, PRT_Data6, PRT_Data7,
+' PRT_Data8, PRT_Data9, PRT_Data10, PRT_Data11, PRT_Data12, PRT_Data13, PRT_Data14,
+' Sht_Total_Area, True_Part_Weight, MachineNumber, Sht_PrimeCode, UsedArea, TaskName, QtyNested
+'
+' The script can also be setup in the Task scheduler, to run unattended, but this version assumes
+' user interaction.  User control is recommended during testing, to be able to evaluate update results
+' as they occur.
+'************************************************************************************************************//
+V.Local.Export.Declare(String)
+V.Local.exists.Declare(Boolean)
+
+' verify the license
+'F.Intrinsic.Control.CallSub(Licenseverification)
+' find the file path
+F.Intrinsic.Control.CallSub(Filepath)
+
+' imported files will go into the V.Args.FILELOC\Processed Directory.  If not found, create it.
+F.Intrinsic.String.Concat(V.Args.FILELOC,"\Processed",V.Local.Export)
+'F.Intrinsic.String.Concat(V.Caller.FilesDir,"\Import\Complete",V.Local.Export)
+F.Intrinsic.File.DirExists(V.Local.Export,V.Local.Exists)
+F.Intrinsic.Control.If(V.Local.exists,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.Export)
+F.Intrinsic.Control.EndIf
+
+' run the process
+F.Intrinsic.Control.CallSub(Get_file,"FILELOC",V.Args.FILELOC,"EMPLOYEE",V.Args.EMPLOYEE)
+' end the script
+F.Intrinsic.Control.End
+
+Program.Sub.Main.End
+
+Program.Sub.Get_File.Start
+F.Intrinsic.Control.SetErrorHandler("Get_File_Err")
+F.Intrinsic.Control.ClearErrors
+
+
+
+V.Local.sError.Declare(String)
+V.Local.sSel.Declare(String)
+V.Local.sSNFilePath.Declare(String)
+V.Local.sSNFiles.Declare(String)
+V.Local.sFilename.Declare(String)
+V.Local.sFileList.Declare(String)
+V.Local.FileDetail.Declare(String)
+V.Local.items.Declare(String)
+V.Local.count.Declare(Long)
+V.Local.Lcount.Declare(Long)
+V.Local.wo.Declare(String)
+V.Local.Lines.Declare(String)
+V.Local.ExportName.Declare(String)
+V.Local.dHours.Declare(Date)
+V.Local.fHours.Declare(Float)
+V.Local.fQty.Declare(Float)
+V.Local.date.Declare(String)
+V.Local.sEmployee.Declare(String)
+V.Local.job.Declare(String)
+V.Local.suffix.Declare(String)
+V.Local.seq.Declare(String)
+V.Local.sWC.Declare(String)
+V.Local.sHours.Declare(String)
+V.Local.sClosed.Declare(String)
+V.Local.sDirect.Declare(String)
+V.Local.sTimeIn.Declare(String)
+V.Local.sTimeOut.Declare(String)
+V.Local.sRateType.Declare(String)
+V.Local.sGood.Declare(String)
+V.Local.sScrap.Declare(String)
+V.Local.sReason.Declare(String)
+V.Local.sPart.Declare(String)
+V.Local.sQty.Declare(String)
+V.Local.sLaborData.Declare(String)
+V.Local.sLaborFile.Declare(String)
+V.Local.sMaterialData.Declare(String)
+V.Local.sMaterialFile.Declare(String)
+V.Local.bFileExists.Declare(Boolean)
+V.Local.sMsg.Declare(String)
+V.Local.sSQL.Declare(String)
+
+
+' NOTE: all information will be on a delmited file.  This sub could be re-written to just reference the elements of the line.
+' I have put everything in it's own variable, to help with understanding what information is used.
+
+Function.Odbc.Connection!Conx.Openconnection(Variable.Ambient.pDSN,Variable.Ambient.PUser,Variable.Ambient.PPass)
+
+' Get list of all files in the directory.  If no files are found, exit program.
+' This script assumes that any file within the specifid directory is an SN feedback file
+' so any file found will be processed.
+F.Intrinsic.File.GetFileList(V.Args.FILELOC,V.Local.sFileList)
+F.Intrinsic.String.Split(V.Local.sFileList,":",V.Local.sSNFiles)
+F.Intrinsic.Control.If(V.Local.sSNFiles(0),=,"")
+'	F.Intrinsic.UI.Msgbox("No Sigma Nset Files To Load")
+	F.Intrinsic.Control.GoTo("EXIT")
+F.Intrinsic.Control.EndIf
+
+
+F.Intrinsic.UI.InvokeWaitDialog("Reading Records from Sigma Nest")
+' for each file
+F.Intrinsic.Control.For(V.Local.count,V.Local.sSNFiles.LBound,V.Local.sSNFiles.UBound,1)
+	' copy the original file to the export directory and delete the original to prevent overwriting
+	F.Intrinsic.String.Concat(V.Args.FILELOC,V.Local.sSNFiles(v.Local.count),V.Local.sFilename)
+'	F.Intrinsic.String.Concat(V.Caller.FilesDir,"\Export\",V.Local.sSNFiles(v.Local.count),V.Local.ExportName)
+	F.Intrinsic.String.Concat(V.Args.FILELOC,"\Processed\",V.Local.sSNFiles(v.Local.count),V.Local.ExportName)
+	F.Intrinsic.File.CopyFile(V.Local.sFilename,V.Local.ExportName)
+	F.Intrinsic.File.DeleteFile(V.Local.sFilename)
+	' read the file copy
+	F.Intrinsic.File.File2String(V.Local.ExportName,V.Local.FileDetail)
+	' split to each line
+	F.Intrinsic.String.Split(V.Local.FileDetail,V.Ambient.NewLine,V.Local.Lines)
+	' for each line; start at line 1 because first line(0) is the header record
+	F.Intrinsic.Control.For(V.Local.Lcount,1,V.Local.Lines.UBound,1)
+		' split out the different fields
+		F.Intrinsic.String.Split(V.Local.Lines(V.Local.Lcount),",",V.Local.items)
+		V.Local.items.RedimPreserve(0,35)
+		' if the job record is not blank (assuming blank line) then proceed
+		F.Intrinsic.Control.If(V.Local.items(0),<>,"")
+
+			' workorder will be Job-Suffix:Seq; split to get each distinct value
+			F.Intrinsic.String.Split(V.Local.items(0),":",V.Local.seq)
+			' job
+			F.Intrinsic.String.Split(V.Local.seq(0),"-",V.Local.wo)
+			V.Local.job.Set(V.Local.wo(0))
+			F.Intrinsic.String.LPad(V.Local.job,"0",6,V.Local.job)
+			' suffix
+			V.Local.suffix.Set(V.Local.wo(1))
+			F.Intrinsic.Control.If(V.Local.suffix.Trim,<>,"")
+				F.Intrinsic.String.LPad(V.Local.suffix.Trim,"0",3,V.Local.suffix)
+			F.Intrinsic.Control.EndIf
+			' seq
+			V.Local.seq.Set(V.Local.seq(1))
+			F.Intrinsic.Control.If(V.Local.seq.Trim,<>,"")
+				F.Intrinsic.String.LPad(V.Local.seq.Trim,"0",6,V.Local.seq)
+			F.Intrinsic.Control.EndIf
+			' workcenter
+			V.Local.sWC.Set(V.Local.items(10).Trim)
+			' Hours
+			V.Local.sHours.Set("0")
+			' closed flag
+			V.Local.sClosed.Set("")
+			' Direct/Indirect flag
+			V.Local.sDirect.Set("D")
+			' Time In/Out
+			' actual time to hte job is determined by start and stop time.  We assume a Start Time of 1:00AM.
+			' Stop Time is determined by adding the run time, in minutes, to the Start Time
+			' hours from the file
+			V.Local.fHours.Set(V.Local.items(5))
+			' multiply by 60, to get the time in minutes
+			F.Intrinsic.Math.Mult(V.Local.fHours,60,V.Local.fHours)
+			' set the 1:00AM time value, formatted as hhmm
+			F.Intrinsic.Date.TimeSerial(01,00,00,V.Local.dHours)
+			F.Intrinsic.String.Format(V.Local.dHours,"hhmm",V.Local.sTimeIn)
+			' add the run time to 1:00AM, format as hhmm
+			F.Intrinsic.Date.DateAdd("N",V.Local.fHours,V.Local.dHours,V.Local.dHours)
+			F.Intrinsic.String.Format(V.Local.dHours,"hhmm",V.Local.sTimeOut)
+			' Rate Type is Regular
+			V.Local.sRateType.Set("R")
+			' Pieces Complete; multiply by 1000 for implied decimal
+			F.Intrinsic.Math.Mult(V.Local.items(3),1000,V.Local.fQty)
+			F.Intrinsic.String.Format(V.Local.fQty,"0",V.Local.sGood)
+			' Scrap/Scrap Reason; not reported here
+			V.Local.sScrap.Set("0")
+			V.Local.sReason.Set("0")
+
+						
+'**************************MATERIAL***********************************
+'			V.Local.sPart.Set(V.Local.items(8))
+			V.Local.sPart.Set(V.Local.items(11))
+			F.Intrinsic.Math.Mult(V.Local.Items(6).Float,V.Local.items(4).Float,V.Local.items(6))
+			F.Intrinsic.Math.Div(V.Local.items(6).Float,V.Local.items(29).Float,V.Local.items(6))
+			F.Intrinsic.String.Format(V.Local.items(6).Trim,"0.00",V.Local.sQty)
+
+			' concat Material informaiton to a line
+			' This information till be written to a file named LMOPEN.txt, which will be sent to WIR100, to create the material issue to the job
+			' This is a comma delimited file, qith fields:
+			' Part, Rev, Loc, Qty, Lot, Bin, Heat, Serial, Job, Suffix, Seq
+			'we will check to see if any material has been issued on the job already, if there has then we will not issue
+			F.Intrinsic.String.Build("SELECT HOURS_ACTUAL FROM V_JOB_OPERATIONS WHERE JOB = '{0}' AND SUFFIX = '{1}' AND SEQ = '{2}' AND HOURS_ACTUAL = 0",V.Local.job,V.Local.suffix,V.Local.seq,V.Local.sSQL)
+			F.ODBC.Connection!Conx.OpenLocalRecordsetRO("rstIssue",V.Local.sSQL)
+			F.Intrinsic.Control.If(V.ODBC.Conx!rstIssue.EOF,=,False)
+				'hours actual = 0 so we can issue it
+				F.Intrinsic.String.Concat(V.Local.sMaterialData,V.Local.sPart.trim,",,,",V.Local.sQty,",","",",","RAWMAT",",","",",","",",",V.Local.job,",",V.Local.suffix,",",V.Local.seq,V.Ambient.NewLine,V.Local.sMaterialData)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.Lcount)
+
+
+'************************LOAD DATA one file at a time*****************************
+	' NOTE: WIR100 now has a callwrapper 450100 that can be used instead
+	F.Intrinsic.String.Concat(V.Caller.FilesDir,"\L",V.Caller.CompanyCode,V.Caller.Terminal,"MOPEN.txt",V.Local.sLaborFile)
+	F.Intrinsic.File.String2File(V.Local.sLaborFile,V.Local.sMaterialData)
+	F.Intrinsic.String.Concat(V.Ambient.DblQuote,"L",V.Caller.CompanyCode,V.Caller.Terminal,"MOPEN.txt",V.Ambient.DblQuote,V.Local.sLaborFile)
+	F.Intrinsic.Task.LaunchGSSSync("WIR100","-C",V.Local.sLaborFile)
+
+F.Intrinsic.Control.Next(V.Local.count)
+
+F.Intrinsic.UI.CloseWaitDialog
+F.Intrinsic.Control.Label("EXIT")
+F.ODBC.Connection!Conx.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Get_File_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: SigmaNest_To_GSS.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.Debug.SetLA(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+Program.Sub.Get_File.End
+
+Program.Sub.Unload.Start
+
+'F.ODBC.Connection!Conx.Close
+F.Intrinsic.Control.End
+
+Program.Sub.Unload.End
+
+Program.Sub.LicenseVerification.Start
+
+V.Local.bLicensed.Declare(Boolean)
+
+' if license is not found, the script will end
+f.Global.General.IsLicensedByModuleName("NES",v.Local.bLicensed)
+F.Intrinsic.Control.If(V.Local.bLicensed,=,False)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+Program.Sub.LicenseVerification.End
+
+Program.Sub.FilePath.Start
+
+V.Local.sSel.Declare(String)
+V.Local.sRet.Declare(String)
+V.Local.sHold.Declare(String)
+V.Local.sVal.Declare(String)
+V.Local.bRet.Declare(Boolean)
+V.Local.sFile.Declare(String)
+V.Local.iFor.Declare(Long)
+V.Local.sEmployee.Declare(String)
+
+' see if the credential file is found
+F.Intrinsic.String.Build("{0}\SNLIC.dat",V.Caller.FilesDir,V.Local.sFile)
+F.Intrinsic.File.Exists(V.Local.sFile,V.Local.bRet)
+
+' if the file is found, look for the COMPLETE line
+F.Intrinsic.Control.If(V.Local.bRet,=,True)
+	F.Intrinsic.File.File2String(V.Local.sFile,V.Local.sRet)
+	F.Intrinsic.String.Split(V.Local.sRet,V.Ambient.NewLine,V.Local.sRet)
+	F.Intrinsic.Control.For(V.Local.iFor,V.Local.sRet.LBound,V.Local.sRet.UBound,1)
+		F.Intrinsic.String.Split(V.Local.sRet(v.Local.iFor),"::",V.Local.sHold)
+		V.Local.sHold.RedimPreserve(0,1)
+		F.Intrinsic.Control.SelectCase(V.Local.sHold(0))
+		' for SN -> GS
+		F.Intrinsic.Control.Case("COMPLETE")
+			V.Local.sVal.Set(V.Local.sHold(1))
+			F.Intrinsic.String.Right(V.Local.sVal,1,V.Local.sRet)
+			F.Intrinsic.Control.If(V.Local.sRet,<>,"\")
+				F.Intrinsic.String.Build("{0}\",V.Local.sVal,V.Local.sVal)
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.ExitFor(V.Local.iFor)
+		' for SN machine employee
+		F.Intrinsic.Control.Case("NESTEMPLOYEE")
+			V.Local.sEmployee.Set(V.Local.sHold(1))
+		F.Intrinsic.Control.EndSelect
+	F.Intrinsic.Control.Next(V.Local.iFor)
+F.Intrinsic.Control.EndIf
+
+' if the path is found,send it back.  otherwise end the script
+F.Intrinsic.Control.If(V.Local.sVal,=,"")
+	F.Intrinsic.UI.Msgbox("INPUT file path not found.")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Variable.AddRV("FILELOC",V.Local.sVal)
+F.Intrinsic.Variable.AddRV("EMPLOYEE",V.Local.sEmployee)
+
+Program.Sub.FilePath.End
+
+
